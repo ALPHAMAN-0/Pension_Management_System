@@ -1,6 +1,6 @@
 # Government Pension Management System — Architecture Guide
 > Designed by: Senior Software Architect Perspective (Google / Amazon Standard)
-> Language: C# | Platform: Desktop (Windows Forms) / or ASP.NET Core (Web)
+> Language: C# (.NET 8) | Platform: ASP.NET Core MVC | Database: SQL Server
 
 ---
 
@@ -8,13 +8,15 @@
 1. [System Overview](#1-system-overview)
 2. [Database Selection](#2-database-selection)
 3. [Layered Architecture](#3-layered-architecture)
-4. [OOP Design](#4-oop-design)
-5. [Role-Based Access Control (RBAC)](#5-role-based-access-control-rbac)
-6. [SOLID Principles Applied](#6-solid-principles-applied)
-7. [Repository Pattern](#7-repository-pattern)
-8. [Project Folder Structure](#8-project-folder-structure)
-9. [Class Diagram Summary](#9-class-diagram-summary)
-10. [Architecture Decision Record (ADR)](#10-architecture-decision-record-adr)
+4. [MVC Request Flow](#4-mvc-request-flow)
+5. [OOP Design](#5-oop-design)
+6. [Role-Based Access Control (RBAC)](#6-role-based-access-control-rbac)
+7. [SOLID Principles Applied](#7-solid-principles-applied)
+8. [Repository Pattern](#8-repository-pattern)
+9. [Project Folder Structure](#9-project-folder-structure)
+10. [Class Diagram Summary](#10-class-diagram-summary)
+11. [Architecture Decision Record (ADR)](#11-architecture-decision-record-adr)
+12. [Quick Start Checklist](#12-quick-start-checklist)
 
 ---
 
@@ -25,13 +27,13 @@
 │              Govt. BD Pension Management System             │
 │                                                             │
 │   Users: System Admin | Pension Admin | Manager | Viewer    │
-│   Tech:  C# | Windows Forms or ASP.NET Core | SQL Server    │
-│   Pattern: Layered Architecture + Repository + RBAC         │
+│   Tech:  C# .NET 8 | ASP.NET Core MVC | SQL Server         │
+│   Pattern: 4-Layer Clean Architecture + Repository + RBAC   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 **Core Modules:**
-- Authentication & Authorization (RBAC)
+- Authentication & Authorization (ASP.NET Core Identity + RBAC)
 - Employee Management
 - Pension Management
 - Payment Tracking
@@ -44,31 +46,32 @@
 
 ### Recommendation: Microsoft SQL Server (MSSQL)
 
-| Option        | Verdict  | Reason                                              |
-|---------------|----------|-----------------------------------------------------|
-| **SQL Server**| BEST     | Native C# integration, Entity Framework support, enterprise-grade |
-| SQLite        | OK       | Good for small desktop apps, no server needed       |
-| MySQL         | OK       | Open source but less native to C#                  |
-| PostgreSQL    | OK       | Powerful but overkill for desktop                  |
-| MongoDB       | NO       | NoSQL — not suitable for relational pension data    |
+| Option         | Verdict | Reason                                                            |
+|----------------|---------|-------------------------------------------------------------------|
+| **SQL Server** | BEST    | Native C# integration, EF Core support, enterprise-grade          |
+| SQLite         | OK      | Good for small apps, but not suited for multi-user web apps       |
+| MySQL          | OK      | Open source but less native to C# ecosystem                       |
+| PostgreSQL     | OK      | Powerful but adds unnecessary complexity for this scope           |
+| MongoDB        | NO      | NoSQL — not suitable for relational pension data                  |
 
 ### Why SQL Server?
-- **Entity Framework Core (EF Core)** integrates perfectly with C# and MSSQL
+- **Entity Framework Core (EF Core)** integrates natively with C# and MSSQL
 - Built-in support for **stored procedures**, **transactions**, and **triggers**
-- **ACID compliance** — critical for financial/pension data
-- **Windows Authentication** — secure, no extra config for government systems
-- Free tier available: **SQL Server Express** (up to 10GB, enough for this system)
+- **ACID compliance** — critical for financial and pension data integrity
+- **Windows Authentication** — secure login without extra credential management
+- Free tier available: **SQL Server Express** (up to 10GB — sufficient for this system)
 
-### Connection (EF Core)
-```csharp
-// appsettings.json
+### Connection String (`appsettings.json`)
+```json
 "ConnectionStrings": {
-  "PensionDB": "Server=.;Database=GovtPensionDB;Trusted_Connection=True;"
+  "PensionDB": "Server=.;Database=GovtPensionDB;Trusted_Connection=True;TrustServerCertificate=True;"
 }
+```
 
-// DbContext
-services.AddDbContext<PensionDbContext>(options =>
-    options.UseSqlServer(configuration.GetConnectionString("PensionDB")));
+### DbContext Registration (`Program.cs`)
+```csharp
+builder.Services.AddDbContext<PensionDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("PensionDB")));
 ```
 
 ---
@@ -76,47 +79,134 @@ services.AddDbContext<PensionDbContext>(options =>
 ## 3. Layered Architecture
 
 ```
-┌──────────────────────────────────────────────┐
-│           PRESENTATION LAYER                 │
-│   Windows Forms / ASP.NET MVC Views          │
-│   - Login Form, Dashboard, Employee Forms    │
-└───────────────────┬──────────────────────────┘
-                    │
-┌───────────────────▼──────────────────────────┐
-│           APPLICATION / SERVICE LAYER        │
-│   Business Logic & Use Case Handlers         │
-│   - AuthService, EmployeeService             │
-│   - PensionService, PaymentService           │
-└───────────────────┬──────────────────────────┘
-                    │
-┌───────────────────▼──────────────────────────┐
-│           DOMAIN LAYER                       │
-│   Core Entities & Interfaces                 │
-│   - Employee, Pension, Payment, Department   │
-│   - IRepository<T>, IUnitOfWork              │
-└───────────────────┬──────────────────────────┘
-                    │
-┌───────────────────▼──────────────────────────┐
-│           INFRASTRUCTURE / DATA LAYER        │
-│   EF Core DbContext + Repository Impl        │
-│   - EmployeeRepository, PensionRepository    │
-│   - SQL Server Database                      │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                  PRESENTATION LAYER                      │
+│              ASP.NET Core MVC                            │
+│                                                          │
+│  Controllers/              Views/                        │
+│  ├── AuthController        ├── Auth/Login.cshtml         │
+│  ├── DashboardController   ├── Dashboard/Index.cshtml    │
+│  ├── EmployeeController    ├── Employee/Index.cshtml     │
+│  ├── PensionController     ├── Pension/Index.cshtml      │
+│  └── PaymentController     └── Shared/_Layout.cshtml     │
+│                                                          │
+│  ViewModels/               wwwroot/                      │
+│  ├── LoginViewModel        ├── css/                      │
+│  ├── EmployeeViewModel     ├── js/                       │
+│  └── PensionViewModel      └── lib/ (Bootstrap 5)        │
+└──────────────────────────┬───────────────────────────────┘
+                           │  (calls via interfaces)
+┌──────────────────────────▼───────────────────────────────┐
+│                  APPLICATION LAYER                       │
+│            Business Logic & Use Cases                    │
+│                                                          │
+│  Services/                 Interfaces/                   │
+│  ├── AuthService           ├── IAuthService              │
+│  ├── EmployeeService       ├── IEmployeeService          │
+│  ├── PensionService        ├── IPensionService           │
+│  ├── PaymentService        └── IPaymentService           │
+│  └── DashboardService                                    │
+│                                                          │
+│  Security/                                               │
+│  └── PermissionGuard       (RBAC enforcement)            │
+└──────────────────────────┬───────────────────────────────┘
+                           │  (depends on interfaces only)
+┌──────────────────────────▼───────────────────────────────┐
+│                  DOMAIN LAYER                            │
+│           Core Entities & Contracts                      │
+│                                                          │
+│  Entities/                 Interfaces/                   │
+│  ├── Employee              ├── IRepository<T>            │
+│  ├── Pension               ├── IEmployeeRepository       │
+│  ├── Payment               ├── IPensionRepository        │
+│  ├── Department            ├── IPaymentRepository        │
+│  ├── SystemUser            └── IUnitOfWork               │
+│  └── Login                                               │
+│                                                          │
+│  Enums/                                                  │
+│  ├── UserRole                                            │
+│  └── PensionStatus                                       │
+└──────────────────────────┬───────────────────────────────┘
+                           │  (implements domain interfaces)
+┌──────────────────────────▼───────────────────────────────┐
+│                  INFRASTRUCTURE LAYER                    │
+│           EF Core + Repositories + Database              │
+│                                                          │
+│  Data/                     Repositories/                 │
+│  ├── PensionDbContext       ├── Repository.cs (generic)  │
+│  └── Migrations/            ├── EmployeeRepository       │
+│                             ├── PensionRepository        │
+│                             ├── PaymentRepository        │
+│                             └── UnitOfWork               │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. OOP Design
+## 4. MVC Request Flow
 
-### 4.1 Encapsulation
+```
+Browser (HTTP Request)
+        │
+        ▼
+┌───────────────────┐
+│   Middleware      │  Authentication, Authorization, Routing
+│   Pipeline        │  app.UseAuthentication()
+│                   │  app.UseAuthorization()
+└────────┬──────────┘
+         │
+         ▼
+┌───────────────────┐
+│   Controller      │  Receives request, calls service
+│                   │  [Authorize(Roles = "PensionAdmin")]
+│  EmployeeCtrl     │  public IActionResult Index() { ... }
+└────────┬──────────┘
+         │
+         ▼
+┌───────────────────┐
+│   Service Layer   │  Business logic, RBAC enforcement
+│                   │  PermissionGuard.Enforce(role, action)
+│  EmployeeService  │
+└────────┬──────────┘
+         │
+         ▼
+┌───────────────────┐
+│   Repository      │  Data access via EF Core
+│                   │  _context.Employees.ToListAsync()
+│  EmployeeRepo     │
+└────────┬──────────┘
+         │
+         ▼
+┌───────────────────┐
+│   SQL Server DB   │  GovtPensionDB
+└────────┬──────────┘
+         │
+         ▼ (data returned back up the chain)
+┌───────────────────┐
+│   ViewModel       │  Map entity → ViewModel for view
+└────────┬──────────┘
+         │
+         ▼
+┌───────────────────┐
+│   Razor View      │  Render HTML — Employee/Index.cshtml
+│   (.cshtml)       │
+└────────┬──────────┘
+         │
+         ▼
+Browser (HTTP Response)
+```
+
+---
+
+## 5. OOP Design
+
+### 5.1 Encapsulation
 ```csharp
 public class Employee
 {
-    // Private fields — data is protected
     private string _empName;
     private DateTime _retirementDate;
 
-    // Public properties — controlled access
     public string EmpName
     {
         get => _empName;
@@ -129,9 +219,9 @@ public class Employee
 }
 ```
 
-### 4.2 Inheritance
+### 5.2 Inheritance
 ```csharp
-// Base class
+// Abstract base — shared by all user roles
 public abstract class SystemUser
 {
     public int UserId { get; set; }
@@ -141,71 +231,50 @@ public abstract class SystemUser
     public abstract bool CanDelete();
 }
 
-// Derived classes
-public class SystemAdmin : SystemUser
-{
-    public override string GetRole() => "SystemAdmin";
-    public override bool CanDelete() => true;
-}
-
-public class PensionAdmin : SystemUser
-{
-    public override string GetRole() => "PensionAdmin";
-    public override bool CanDelete() => true;
-}
-
-public class PensionManager : SystemUser
-{
-    public override string GetRole() => "PensionManager";
-    public override bool CanDelete() => false;
-}
-
-public class Viewer : SystemUser
-{
-    public override string GetRole() => "Viewer";
-    public override bool CanDelete() => false;
-}
+// Concrete role classes
+public class SystemAdmin    : SystemUser { public override string GetRole() => "SystemAdmin";    public override bool CanDelete() => true;  }
+public class PensionAdmin   : SystemUser { public override string GetRole() => "PensionAdmin";   public override bool CanDelete() => true;  }
+public class PensionManager : SystemUser { public override string GetRole() => "PensionManager"; public override bool CanDelete() => false; }
+public class Viewer         : SystemUser { public override string GetRole() => "Viewer";         public override bool CanDelete() => false; }
 ```
 
-### 4.3 Polymorphism
+### 5.3 Polymorphism
 ```csharp
-// Same method — different behavior per role
-List<SystemUser> users = new List<SystemUser>
-{
-    new SystemAdmin(),
-    new PensionManager(),
-    new Viewer()
-};
+// Same method call — different behavior per role type
+List<SystemUser> users = new() { new SystemAdmin(), new PensionManager(), new Viewer() };
 
 foreach (var user in users)
-{
-    Console.WriteLine($"{user.GetRole()} - Can Delete: {user.CanDelete()}");
-}
+    Console.WriteLine($"{user.GetRole()} — Can Delete: {user.CanDelete()}");
 ```
 
-### 4.4 Abstraction
+### 5.4 Abstraction
 ```csharp
-public interface IPensionService
+// Controller only knows the interface — not the implementation
+public class PensionController : Controller
 {
-    Task<Pension> GetPensionByEmployeeIdAsync(int empId);
-    Task<bool> UpdatePensionStatusAsync(int pensionId, string status);
-    Task<IEnumerable<Pension>> GetAllActivePensionsAsync();
-}
+    private readonly IPensionService _pensionService;
 
-// Complex DB logic hidden behind simple interface
-public class PensionService : IPensionService { /* implementation */ }
+    public PensionController(IPensionService pensionService)
+        => _pensionService = pensionService;
+
+    public async Task<IActionResult> Index()
+    {
+        var pensions = await _pensionService.GetAllActivePensionsAsync();
+        return View(pensions);
+    }
+}
 ```
 
 ---
 
-## 5. Role-Based Access Control (RBAC)
+## 6. Role-Based Access Control (RBAC)
 
 ### Permission Matrix
 
 | Feature                  | System Admin | Pension Admin | Pension Manager | Viewer |
 |--------------------------|:---:|:---:|:---:|:---:|
 | Login                    | YES | YES | YES | YES |
-| Create/Delete Users      | YES | NO  | NO  | NO  |
+| Create / Delete Users    | YES | NO  | NO  | NO  |
 | Add Employee             | NO  | YES | NO  | NO  |
 | Edit Employee            | NO  | YES | NO  | NO  |
 | Delete Employee          | NO  | YES | NO  | NO  |
@@ -216,18 +285,29 @@ public class PensionService : IPensionService { /* implementation */ }
 | View Dashboard Analytics | YES | YES | YES | NO  |
 | System Configuration     | YES | NO  | NO  | NO  |
 
-### RBAC Implementation
+### Controller-Level Authorization
 ```csharp
-// Role enum
-public enum UserRole
+// Only Pension Admin can access these actions
+[Authorize(Roles = "PensionAdmin")]
+public class EmployeeController : Controller
 {
-    SystemAdmin,
-    PensionAdmin,
-    PensionManager,
-    Viewer
+    [HttpPost]
+    public async Task<IActionResult> Delete(int id) { ... }
 }
 
-// Permission checker
+// Multiple roles allowed
+[Authorize(Roles = "SystemAdmin,PensionAdmin,PensionManager")]
+public IActionResult Index() { ... }
+
+// All authenticated users
+[Authorize]
+public IActionResult Dashboard() { ... }
+```
+
+### PermissionGuard (Service-Level Enforcement)
+```csharp
+public enum UserRole { SystemAdmin, PensionAdmin, PensionManager, Viewer }
+
 public static class PermissionGuard
 {
     private static readonly Dictionary<UserRole, HashSet<string>> _permissions = new()
@@ -248,126 +328,129 @@ public static class PermissionGuard
                 $"Role '{role}' does not have permission: '{permission}'");
     }
 }
+```
 
-// Usage in service
-public class EmployeeService
+### Razor View — Role-Conditional UI
+```html
+@using Microsoft.AspNetCore.Identity
+
+@if (User.IsInRole("PensionAdmin") || User.IsInRole("SystemAdmin"))
 {
-    public void DeleteEmployee(SystemUser currentUser, int empId)
-    {
-        PermissionGuard.Enforce(currentUser.Role, "ManageEmployee");
+    <a asp-action="Create" class="btn btn-primary">Add Employee</a>
+    <a asp-action="Delete" class="btn btn-danger">Delete</a>
+}
 
-        if (!currentUser.CanDelete())
-            throw new UnauthorizedAccessException("This role cannot delete records.");
-
-        // proceed with deletion
-    }
+@if (User.IsInRole("Viewer"))
+{
+    <p class="text-muted">Read-only access. Contact admin for changes.</p>
 }
 ```
 
 ---
 
-## 6. SOLID Principles Applied
+## 7. SOLID Principles Applied
 
 ### S — Single Responsibility
 ```csharp
-// WRONG — one class doing everything
-public class EmployeeManager
+// WRONG — controller doing business logic
+public class EmployeeController : Controller
 {
-    public void AddEmployee() { }
-    public void SendEmail() { }       // NOT employee's job
-    public void GenerateReport() { } // NOT employee's job
+    public IActionResult Create(Employee emp)
+    {
+        // validation, DB save, email — all here = violation
+    }
 }
 
-// CORRECT — each class has one job
-public class EmployeeService   { public void AddEmployee() { } }
-public class EmailService      { public void SendEmail() { } }
-public class ReportService     { public void GenerateReport() { } }
+// CORRECT — controller delegates, service handles logic
+public class EmployeeController : Controller
+{
+    private readonly IEmployeeService _service;
+    public EmployeeController(IEmployeeService service) => _service = service;
+
+    public async Task<IActionResult> Create(EmployeeViewModel vm)
+    {
+        await _service.AddEmployeeAsync(vm);  // single responsibility
+        return RedirectToAction("Index");
+    }
+}
 ```
 
 ### O — Open/Closed
 ```csharp
-// Open for extension, closed for modification
+// Base calculator — closed for modification
 public abstract class PensionCalculator
 {
     public abstract decimal Calculate(Employee emp);
 }
 
+// Open for extension — add new type without touching existing code
 public class StandardPensionCalculator : PensionCalculator
 {
-    public override decimal Calculate(Employee emp)
-        => emp.BasicSalary * 0.80m;
+    public override decimal Calculate(Employee emp) => emp.BasicSalary * 0.80m;
 }
 
 public class SpecialPensionCalculator : PensionCalculator
 {
-    public override decimal Calculate(Employee emp)
-        => emp.BasicSalary * 0.90m; // extended, not modified
+    public override decimal Calculate(Employee emp) => emp.BasicSalary * 0.90m;
 }
 ```
 
 ### L — Liskov Substitution
 ```csharp
-// Any subclass of SystemUser can replace the base class safely
-public void ShowUserDashboard(SystemUser user)
+// Any SystemUser subclass safely replaces the base
+public IActionResult Welcome(SystemUser user)
 {
-    Console.WriteLine($"Welcome {user.UserName} — Role: {user.GetRole()}");
+    ViewBag.Role = user.GetRole();       // works for ALL role types
+    ViewBag.CanDelete = user.CanDelete();
+    return View();
 }
-
-// Works with ALL derived types
-ShowUserDashboard(new SystemAdmin());
-ShowUserDashboard(new Viewer());
 ```
 
 ### I — Interface Segregation
 ```csharp
-// WRONG — fat interface
+// WRONG — fat interface forces all roles to implement unused methods
 public interface IUserActions
 {
     void AddEmployee();
     void DeleteEmployee();
-    void ViewEmployee();   // Viewer only needs this
+    void ViewEmployee();
     void ManageUsers();
 }
 
-// CORRECT — split by responsibility
-public interface IViewable    { Task<IEnumerable<Employee>> GetAllAsync(); }
-public interface IManageable  { Task AddAsync(Employee e); Task DeleteAsync(int id); }
+// CORRECT — segregated interfaces
+public interface IViewable      { Task<IEnumerable<Employee>> GetAllAsync(); }
+public interface IManageable    { Task AddAsync(Employee e); Task DeleteAsync(int id); }
 public interface IAdministrable { Task ManageUsersAsync(); }
 
-// Viewer only implements what it needs
-public class ViewerDashboard : IViewable { /* only view */ }
-
-// Pension Admin implements more
-public class PensionAdminDashboard : IViewable, IManageable { /* view + manage */ }
+// Each service implements only what it needs
+public class EmployeeService  : IViewable, IManageable  { }
+public class DashboardService : IViewable               { }
 ```
 
 ### D — Dependency Inversion
 ```csharp
-// WRONG — depends on concrete class
-public class EmployeeService
+// WRONG — controller tightly coupled to concrete class
+public class EmployeeController : Controller
 {
-    private EmployeeRepository _repo = new EmployeeRepository(); // tightly coupled
+    private EmployeeService _service = new EmployeeService(); // bad
 }
 
-// CORRECT — depends on abstraction
-public class EmployeeService
+// CORRECT — depends on interface, injected by DI container
+public class EmployeeController : Controller
 {
-    private readonly IEmployeeRepository _repo;
-
-    public EmployeeService(IEmployeeRepository repo) // injected
-    {
-        _repo = repo;
-    }
+    private readonly IEmployeeService _service;
+    public EmployeeController(IEmployeeService service) => _service = service;
 }
 
-// Register in DI container
-services.AddScoped<IEmployeeRepository, EmployeeRepository>();
-services.AddScoped<IEmployeeService, EmployeeService>();
+// Registered in Program.cs
+builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 ```
 
 ---
 
-## 7. Repository Pattern
+## 8. Repository Pattern
 
 ### Generic Interface
 ```csharp
@@ -381,12 +464,12 @@ public interface IRepository<T> where T : class
 }
 ```
 
-### Specific Repository Interface
+### Specific Repository Interfaces
 ```csharp
 public interface IEmployeeRepository : IRepository<Employee>
 {
-    Task<IEnumerable<Employee>> GetByStatusAsync(string status);   // Active / Retired
-    Task<Employee?> GetByDepartmentAsync(int deptId);
+    Task<IEnumerable<Employee>> GetByStatusAsync(string status);
+    Task<IEnumerable<Employee>> GetByDepartmentAsync(int deptId);
     Task<Employee?> SearchByIdAsync(string empId);
 }
 
@@ -394,6 +477,11 @@ public interface IPensionRepository : IRepository<Pension>
 {
     Task<Pension?> GetByEmployeeIdAsync(int empId);
     Task<IEnumerable<Pension>> GetActivePensionsAsync();
+}
+
+public interface IPaymentRepository : IRepository<Payment>
+{
+    Task<IEnumerable<Payment>> GetByPensionIdAsync(int pensionId);
 }
 ```
 
@@ -410,14 +498,29 @@ public class Repository<T> : IRepository<T> where T : class
         _dbSet   = context.Set<T>();
     }
 
-    public async Task<T?> GetByIdAsync(int id)        => await _dbSet.FindAsync(id);
-    public async Task<IEnumerable<T>> GetAllAsync()   => await _dbSet.ToListAsync();
-    public async Task AddAsync(T entity)               { await _dbSet.AddAsync(entity); await _context.SaveChangesAsync(); }
-    public async Task UpdateAsync(T entity)            { _dbSet.Update(entity); await _context.SaveChangesAsync(); }
+    public async Task<T?> GetByIdAsync(int id)      => await _dbSet.FindAsync(id);
+    public async Task<IEnumerable<T>> GetAllAsync() => await _dbSet.ToListAsync();
+
+    public async Task AddAsync(T entity)
+    {
+        await _dbSet.AddAsync(entity);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task UpdateAsync(T entity)
+    {
+        _dbSet.Update(entity);
+        await _context.SaveChangesAsync();
+    }
+
     public async Task DeleteAsync(int id)
     {
         var entity = await GetByIdAsync(id);
-        if (entity != null) { _dbSet.Remove(entity); await _context.SaveChangesAsync(); }
+        if (entity is not null)
+        {
+            _dbSet.Remove(entity);
+            await _context.SaveChangesAsync();
+        }
     }
 }
 ```
@@ -435,6 +538,7 @@ public interface IUnitOfWork : IDisposable
 public class UnitOfWork : IUnitOfWork
 {
     private readonly PensionDbContext _context;
+
     public IEmployeeRepository Employees { get; }
     public IPensionRepository  Pensions  { get; }
     public IPaymentRepository  Payments  { get; }
@@ -457,18 +561,18 @@ public class UnitOfWork : IUnitOfWork
 
 ---
 
-## 8. Project Folder Structure
+## 9. Project Folder Structure
 
 ```
 GovtPensionSystem/
 │
-├── Domain/                         # Core business entities & interfaces
+├── Domain/                               # No external dependencies
 │   ├── Entities/
 │   │   ├── Employee.cs
 │   │   ├── Pension.cs
 │   │   ├── Payment.cs
 │   │   ├── Department.cs
-│   │   ├── SystemUser.cs           # Base user class
+│   │   ├── SystemUser.cs                 # Abstract base user
 │   │   └── Login.cs
 │   ├── Enums/
 │   │   ├── UserRole.cs
@@ -480,7 +584,7 @@ GovtPensionSystem/
 │       ├── IPaymentRepository.cs
 │       └── IUnitOfWork.cs
 │
-├── Application/                    # Business logic / services
+├── Application/                          # Depends only on Domain
 │   ├── Services/
 │   │   ├── AuthService.cs
 │   │   ├── EmployeeService.cs
@@ -490,42 +594,72 @@ GovtPensionSystem/
 │   ├── Interfaces/
 │   │   ├── IAuthService.cs
 │   │   ├── IEmployeeService.cs
-│   │   └── IPensionService.cs
+│   │   ├── IPensionService.cs
+│   │   └── IDashboardService.cs
 │   └── Security/
-│       └── PermissionGuard.cs      # RBAC enforcement
+│       └── PermissionGuard.cs
 │
-├── Infrastructure/                 # DB, EF Core, Repositories
+├── Infrastructure/                       # Depends on Domain
 │   ├── Data/
 │   │   ├── PensionDbContext.cs
 │   │   └── Migrations/
 │   └── Repositories/
-│       ├── Repository.cs           # Generic base
+│       ├── Repository.cs
 │       ├── EmployeeRepository.cs
 │       ├── PensionRepository.cs
 │       ├── PaymentRepository.cs
 │       └── UnitOfWork.cs
 │
-├── Presentation/                   # UI Layer (Windows Forms)
-│   ├── Forms/
-│   │   ├── LoginForm.cs
-│   │   ├── DashboardForm.cs
-│   │   ├── EmployeeForm.cs
-│   │   └── PensionForm.cs
-│   └── Controllers/                # (if ASP.NET Core)
-│       ├── EmployeeController.cs
-│       └── PensionController.cs
+├── Presentation/                         # ASP.NET Core MVC
+│   ├── Controllers/
+│   │   ├── AuthController.cs
+│   │   ├── DashboardController.cs
+│   │   ├── EmployeeController.cs
+│   │   ├── PensionController.cs
+│   │   └── PaymentController.cs
+│   ├── Views/
+│   │   ├── Auth/
+│   │   │   ├── Login.cshtml
+│   │   │   └── Register.cshtml
+│   │   ├── Dashboard/
+│   │   │   └── Index.cshtml
+│   │   ├── Employee/
+│   │   │   ├── Index.cshtml
+│   │   │   ├── Create.cshtml
+│   │   │   ├── Edit.cshtml
+│   │   │   └── Details.cshtml
+│   │   ├── Pension/
+│   │   │   ├── Index.cshtml
+│   │   │   ├── Create.cshtml
+│   │   │   └── Details.cshtml
+│   │   └── Shared/
+│   │       ├── _Layout.cshtml
+│   │       ├── _Navbar.cshtml
+│   │       └── _ValidationScripts.cshtml
+│   ├── ViewModels/
+│   │   ├── LoginViewModel.cs
+│   │   ├── EmployeeViewModel.cs
+│   │   ├── PensionViewModel.cs
+│   │   └── DashboardViewModel.cs
+│   └── wwwroot/
+│       ├── css/
+│       ├── js/
+│       └── lib/                          # Bootstrap 5, jQuery
 │
-├── Tests/                          # Unit & Integration tests
+├── Tests/
 │   ├── EmployeeServiceTests.cs
 │   ├── PensionServiceTests.cs
 │   └── PermissionGuardTests.cs
 │
-└── Program.cs                      # Entry point + DI setup
+├── appsettings.json
+├── architecture.md
+├── README.md
+└── Program.cs                            # DI registration + middleware pipeline
 ```
 
 ---
 
-## 9. Class Diagram Summary
+## 10. Class Diagram Summary
 
 ```
 SystemUser (abstract)
@@ -534,9 +668,9 @@ SystemUser (abstract)
 ├── PensionManager
 └── Viewer
 
-Department ──── Employee ──── Pension ──── Payment
-                   │
-                  User ──── Login
+Department (1:N) ──── Employee (1:1) ──── Pension (1:N) ──── Payment
+                           │
+                          User (1:1) ──── Login
 
 IRepository<T>
 ├── IEmployeeRepository
@@ -544,38 +678,49 @@ IRepository<T>
 └── IPaymentRepository
 
 IUnitOfWork
-└── UnitOfWork (aggregates all repositories)
+└── UnitOfWork
+    ├── IEmployeeRepository
+    ├── IPensionRepository
+    └── IPaymentRepository
+
+Controller ──► IService ──► IRepository ──► DbContext ──► SQL Server
 ```
 
 ---
 
-## 10. Architecture Decision Record (ADR)
+## 11. Architecture Decision Record (ADR)
 
 | Decision | Choice | Reason |
 |---|---|---|
-| Language | C# | OOP-native, strong typing, enterprise support |
-| Database | SQL Server Express | ACID, EF Core native, Windows Auth, free |
-| ORM | Entity Framework Core | Reduces boilerplate, migrations, LINQ queries |
-| Pattern | Repository + UoW | Decouples DB logic, testable, maintainable |
-| Access Control | RBAC (Role-Based) | Matches 4 defined roles in requirements |
-| Architecture | Layered (4-tier) | Clean separation, scalable, testable |
-| DI Container | Microsoft.Extensions.DI | Built-in, no extra library needed |
-| Testing | xUnit + Moq | Industry standard for C# unit testing |
+| Language | C# .NET 8 | OOP-native, strongly typed, enterprise-ready |
+| Web Framework | ASP.NET Core MVC | Industry standard, Razor views, clean MVC separation |
+| Database | SQL Server Express | ACID compliant, EF Core native, free tier available |
+| ORM | Entity Framework Core | Code-first migrations, LINQ queries, reduces boilerplate |
+| Pattern | Repository + Unit of Work | Decouples DB logic, fully testable, maintainable |
+| Access Control | RBAC (ASP.NET Core Identity + PermissionGuard) | Matches 4 defined roles, built-in middleware support |
+| Architecture | 4-Layer Clean Architecture | Clear separation of concerns, scalable, independently testable |
+| DI Container | Microsoft.Extensions.DI | Built-in to ASP.NET Core, no extra libraries needed |
+| View Engine | Razor (.cshtml) | Server-side rendering, native to ASP.NET Core MVC |
+| Frontend | Bootstrap 5 | Responsive UI, fast to set up, widely supported |
+| Testing | xUnit + Moq | Industry standard for C# unit and mock testing |
 
 ---
 
-## Quick Start Checklist
+## 12. Quick Start Checklist
 
 - [ ] Create SQL Server Express database `GovtPensionDB`
-- [ ] Set up EF Core and run migrations
-- [ ] Implement Domain entities
-- [ ] Implement Generic Repository and specific repositories
-- [ ] Implement Unit of Work
-- [ ] Implement Services with SOLID principles
-- [ ] Add PermissionGuard for RBAC
-- [ ] Build UI Forms with role-based visibility
-- [ ] Write unit tests for services
-- [ ] Final integration testing
+- [ ] Configure connection string in `appsettings.json`
+- [ ] Implement Domain entities and enums
+- [ ] Implement `IRepository<T>` and specific repository interfaces
+- [ ] Implement `Repository<T>`, specific repositories, and `UnitOfWork`
+- [ ] Implement Application services with SOLID principles
+- [ ] Add `PermissionGuard` for service-level RBAC
+- [ ] Register all services and repositories in `Program.cs` (DI)
+- [ ] Build Controllers with `[Authorize(Roles = "...")]` attributes
+- [ ] Create Razor Views with role-conditional UI rendering
+- [ ] Apply EF Core migrations (`dotnet ef database update`)
+- [ ] Write unit tests for services and permission guard
+- [ ] Final integration and browser testing
 
 ---
 

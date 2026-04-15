@@ -20,11 +20,11 @@
 
 ## About the Project
 
-**Govt. BD Pension** is a desktop-based Pension Management System built with **C# Windows Forms** and **SQL Server**, designed to digitalize and centralize government pension record management.
+**Govt. BD Pension** is a web-based Pension Management System built with **ASP.NET Core MVC** and **SQL Server**, designed to digitalize and centralize government pension record management.
 
-Many government offices still manage pension records manually or through partially digital systems — leading to slow processing, repeated data entries, lack of transparency, and record-handling mistakes. This system solves those problems by providing a secure, structured, and role-controlled platform.
+Many government offices still manage pension records manually or through partially digital systems — leading to slow processing, repeated data entries, lack of transparency, and record-handling mistakes. This system solves those problems by providing a secure, structured, and role-controlled web platform.
 
-> Built as an academic application of **OOP concepts**, **GUI design**, **SOLID principles**, and **database integration**, based on a real-life government pension management scenario.
+> Built applying **OOP concepts**, **SOLID principles**, **Repository Pattern**, and **Role-Based Access Control (RBAC)**, based on a real-life government pension management scenario.
 
 ---
 
@@ -40,12 +40,14 @@ Many government offices still manage pension records manually or through partial
 - Filter employees by status (Active / Retired / Pending)
 
 ### Technical Highlights
+- ASP.NET Core MVC — clean separation of Models, Views, Controllers
 - 4-layer clean architecture (Presentation, Application, Domain, Infrastructure)
 - Generic Repository Pattern + Unit of Work
 - SOLID design principles throughout
 - Entity Framework Core with SQL Server
-- Role-Based Access Control (RBAC) with `PermissionGuard`
+- Role-Based Access Control (RBAC) with ASP.NET Core Identity
 - Dependency Injection via `Microsoft.Extensions.DependencyInjection`
+- Razor Views for dynamic server-side rendered UI
 
 ---
 
@@ -66,14 +68,17 @@ The system uses **Role-Based Access Control (RBAC)** with 4 distinct roles:
 
 | Layer | Technology |
 |---|---|
-| Language | C# (.NET) |
-| UI Framework | Windows Forms |
+| Language | C# (.NET 8) |
+| Web Framework | ASP.NET Core MVC |
+| View Engine | Razor (.cshtml) |
 | Database | Microsoft SQL Server Express |
 | ORM | Entity Framework Core |
-| Architecture | 4-Layer (Presentation / Application / Domain / Infrastructure) |
+| Authentication | ASP.NET Core Identity |
+| Architecture | 4-Layer Clean Architecture |
 | Pattern | Repository Pattern + Unit of Work |
 | Access Control | Role-Based Access Control (RBAC) |
 | Dependency Injection | Microsoft.Extensions.DependencyInjection |
+| Frontend Styling | Bootstrap 5 |
 | Testing | xUnit + Moq |
 
 ---
@@ -81,36 +86,64 @@ The system uses **Role-Based Access Control (RBAC)** with 4 distinct roles:
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────┐
-│           PRESENTATION LAYER                 │
-│   Windows Forms UI                           │
-│   Login, Dashboard, Employee, Pension Forms  │
-└───────────────────┬──────────────────────────┘
-                    │
-┌───────────────────▼──────────────────────────┐
-│           APPLICATION LAYER                  │
-│   Business Logic & Services                  │
-│   AuthService, EmployeeService               │
-│   PensionService, PaymentService             │
-│   PermissionGuard (RBAC)                     │
-└───────────────────┬──────────────────────────┘
-                    │
-┌───────────────────▼──────────────────────────┐
-│           DOMAIN LAYER                       │
-│   Core Entities & Interfaces                 │
-│   Employee, Pension, Payment, Department     │
-│   IRepository<T>, IUnitOfWork                │
-└───────────────────┬──────────────────────────┘
-                    │
-┌───────────────────▼──────────────────────────┐
-│           INFRASTRUCTURE LAYER               │
-│   EF Core DbContext + Repositories           │
-│   EmployeeRepository, PensionRepository      │
-│   SQL Server Database                        │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│               PRESENTATION LAYER                     │
+│         ASP.NET Core MVC                             │
+│                                                      │
+│   Controllers/          Views/                       │
+│   ├── HomeController    ├── Home/                    │
+│   ├── AuthController    ├── Auth/                    │
+│   ├── EmployeeCtrl      ├── Employee/                │
+│   ├── PensionCtrl       ├── Pension/                 │
+│   └── DashboardCtrl     └── Dashboard/               │
+└───────────────────────┬──────────────────────────────┘
+                        │
+┌───────────────────────▼──────────────────────────────┐
+│               APPLICATION LAYER                      │
+│         Business Logic & Services                    │
+│                                                      │
+│   Services/             Interfaces/                  │
+│   ├── AuthService       ├── IAuthService             │
+│   ├── EmployeeService   ├── IEmployeeService         │
+│   ├── PensionService    ├── IPensionService          │
+│   ├── PaymentService    └── IPaymentService          │
+│   └── DashboardService                               │
+│                                                      │
+│   Security/                                          │
+│   └── PermissionGuard   (RBAC enforcement)           │
+└───────────────────────┬──────────────────────────────┘
+                        │
+┌───────────────────────▼──────────────────────────────┐
+│               DOMAIN LAYER                           │
+│         Core Entities & Interfaces                   │
+│                                                      │
+│   Entities/             Interfaces/                  │
+│   ├── Employee          ├── IRepository<T>           │
+│   ├── Pension           ├── IEmployeeRepository      │
+│   ├── Payment           ├── IPensionRepository       │
+│   ├── Department        ├── IPaymentRepository       │
+│   ├── SystemUser        └── IUnitOfWork              │
+│   └── Login                                          │
+│                                                      │
+│   Enums/                                             │
+│   ├── UserRole                                       │
+│   └── PensionStatus                                  │
+└───────────────────────┬──────────────────────────────┘
+                        │
+┌───────────────────────▼──────────────────────────────┐
+│               INFRASTRUCTURE LAYER                   │
+│         EF Core + Repositories + DB                  │
+│                                                      │
+│   Data/                 Repositories/                │
+│   ├── PensionDbContext  ├── Repository.cs (generic)  │
+│   └── Migrations/       ├── EmployeeRepository       │
+│                         ├── PensionRepository        │
+│                         ├── PaymentRepository        │
+│                         └── UnitOfWork               │
+└──────────────────────────────────────────────────────┘
 ```
 
-For full architecture details, see [architecture.md](architecture.md).
+For full architecture and code details, see [architecture.md](architecture.md).
 
 ---
 
@@ -130,13 +163,13 @@ Payment    → PaymentID, PayDate, Method, Amount, PensionID (FK)
 ### Entity Relationships
 
 ```
-User (1:1) ──── Login
-Department (1:N) ──── Employee
-Employee (1:1) ──── Pension
-Pension (1:N) ──── Payment
+User       (1:1)  ────  Login
+Department (1:N)  ────  Employee
+Employee   (1:1)  ────  Pension
+Pension    (1:N)  ────  Payment
 ```
 
-### Database Setup (SQL Server)
+### Database Setup
 
 ```sql
 CREATE DATABASE GovtPensionDB;
@@ -157,13 +190,13 @@ CREATE DATABASE GovtPensionDB;
 ```
 GovtPensionSystem/
 │
-├── Domain/
+├── Domain/                               # Core business rules — no dependencies
 │   ├── Entities/
 │   │   ├── Employee.cs
 │   │   ├── Pension.cs
 │   │   ├── Payment.cs
 │   │   ├── Department.cs
-│   │   ├── SystemUser.cs
+│   │   ├── SystemUser.cs                 # Abstract base user
 │   │   └── Login.cs
 │   ├── Enums/
 │   │   ├── UserRole.cs
@@ -175,7 +208,7 @@ GovtPensionSystem/
 │       ├── IPaymentRepository.cs
 │       └── IUnitOfWork.cs
 │
-├── Application/
+├── Application/                          # Business logic — depends only on Domain
 │   ├── Services/
 │   │   ├── AuthService.cs
 │   │   ├── EmployeeService.cs
@@ -187,25 +220,53 @@ GovtPensionSystem/
 │   │   ├── IEmployeeService.cs
 │   │   └── IPensionService.cs
 │   └── Security/
-│       └── PermissionGuard.cs
+│       └── PermissionGuard.cs            # RBAC permission enforcement
 │
-├── Infrastructure/
+├── Infrastructure/                       # DB access — depends on Domain
 │   ├── Data/
 │   │   ├── PensionDbContext.cs
 │   │   └── Migrations/
 │   └── Repositories/
-│       ├── Repository.cs
+│       ├── Repository.cs                 # Generic base repository
 │       ├── EmployeeRepository.cs
 │       ├── PensionRepository.cs
 │       ├── PaymentRepository.cs
 │       └── UnitOfWork.cs
 │
-├── Presentation/
-│   └── Forms/
-│       ├── LoginForm.cs
-│       ├── DashboardForm.cs
-│       ├── EmployeeForm.cs
-│       └── PensionForm.cs
+├── Presentation/                         # ASP.NET Core MVC — depends on Application
+│   ├── Controllers/
+│   │   ├── AuthController.cs
+│   │   ├── DashboardController.cs
+│   │   ├── EmployeeController.cs
+│   │   ├── PensionController.cs
+│   │   └── PaymentController.cs
+│   ├── Views/
+│   │   ├── Auth/
+│   │   │   ├── Login.cshtml
+│   │   │   └── Register.cshtml
+│   │   ├── Dashboard/
+│   │   │   └── Index.cshtml
+│   │   ├── Employee/
+│   │   │   ├── Index.cshtml
+│   │   │   ├── Create.cshtml
+│   │   │   ├── Edit.cshtml
+│   │   │   └── Details.cshtml
+│   │   ├── Pension/
+│   │   │   ├── Index.cshtml
+│   │   │   ├── Create.cshtml
+│   │   │   └── Details.cshtml
+│   │   └── Shared/
+│   │       ├── _Layout.cshtml
+│   │       ├── _Navbar.cshtml
+│   │       └── _ValidationScripts.cshtml
+│   ├── ViewModels/
+│   │   ├── LoginViewModel.cs
+│   │   ├── EmployeeViewModel.cs
+│   │   └── PensionViewModel.cs
+│   └── wwwroot/
+│       ├── css/
+│       ├── js/
+│       └── lib/                          # Bootstrap 5, jQuery
 │
 ├── Tests/
 │   ├── EmployeeServiceTests.cs
@@ -214,7 +275,8 @@ GovtPensionSystem/
 │
 ├── architecture.md
 ├── README.md
-└── Program.cs
+├── appsettings.json
+└── Program.cs                            # DI setup + middleware pipeline
 ```
 
 ---
@@ -223,44 +285,42 @@ GovtPensionSystem/
 
 ### Prerequisites
 
-- [Visual Studio 2022](https://visualstudio.microsoft.com/) or later
-- [.NET 8 SDK](https://dotnet.microsoft.com/)
+- [Visual Studio 2022](https://visualstudio.microsoft.com/) or [VS Code](https://code.visualstudio.com/)
+- [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download)
 - [SQL Server Express](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) (free)
 - [SQL Server Management Studio (SSMS)](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms) (optional)
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-username/GovtPensionSystem.git
-   cd GovtPensionSystem
-   ```
+**1. Clone the repository**
+```bash
+git clone https://github.com/your-username/GovtPensionSystem.git
+cd GovtPensionSystem
+```
 
-2. **Setup the database**
-   ```bash
-   # Open SQL Server Management Studio and create database
-   CREATE DATABASE GovtPensionDB;
-   ```
+**2. Configure the connection string**
 
-3. **Configure connection string**
+Edit `appsettings.json`:
+```json
+"ConnectionStrings": {
+  "PensionDB": "Server=.;Database=GovtPensionDB;Trusted_Connection=True;TrustServerCertificate=True;"
+}
+```
 
-   Update `appsettings.json` or `App.config`:
-   ```json
-   "ConnectionStrings": {
-     "PensionDB": "Server=.;Database=GovtPensionDB;Trusted_Connection=True;"
-   }
-   ```
+**3. Apply EF Core migrations**
+```bash
+dotnet ef database update
+```
 
-4. **Run EF Core Migrations**
-   ```bash
-   dotnet ef database update
-   ```
+**4. Run the application**
+```bash
+dotnet run
+```
 
-5. **Build and run**
-   ```bash
-   dotnet build
-   dotnet run
-   ```
+**5. Open in browser**
+```
+https://localhost:5001
+```
 
 ---
 
@@ -284,38 +344,67 @@ GovtPensionSystem/
 
 ## Design Principles
 
-This project is built following industry-standard software engineering principles:
-
 ### OOP (Object-Oriented Programming)
+
 | Principle | Applied In |
 |---|---|
 | **Encapsulation** | Private fields with controlled property access in all entities |
 | **Inheritance** | `SystemAdmin`, `PensionAdmin`, `PensionManager`, `Viewer` extend `SystemUser` |
-| **Polymorphism** | Role-based behavior using overridden methods (`GetRole()`, `CanDelete()`) |
-| **Abstraction** | Service interfaces hide complex business and DB logic |
+| **Polymorphism** | Role-based behavior via overridden `GetRole()` and `CanDelete()` methods |
+| **Abstraction** | Service interfaces hide complex business and DB logic from controllers |
 
 ### SOLID Principles
+
 | Principle | Applied In |
 |---|---|
-| **Single Responsibility** | Each service class handles one domain (Employee, Pension, Payment) |
-| **Open/Closed** | `PensionCalculator` extended without modifying base logic |
+| **Single Responsibility** | Each controller and service handles one domain only |
+| **Open / Closed** | `PensionCalculator` extended without modifying base logic |
 | **Liskov Substitution** | All role subclasses safely replace `SystemUser` base class |
 | **Interface Segregation** | `IViewable`, `IManageable`, `IAdministrable` split by responsibility |
-| **Dependency Inversion** | All services depend on interfaces, injected via DI container |
+| **Dependency Inversion** | Controllers depend on service interfaces injected via DI container |
 
 ### Repository Pattern
-- Generic `IRepository<T>` base interface
-- Specific repositories (`IEmployeeRepository`, `IPensionRepository`)
-- `UnitOfWork` coordinates all repositories in a single transaction
+
+| Component | Purpose |
+|---|---|
+| `IRepository<T>` | Generic base — GetById, GetAll, Add, Update, Delete |
+| `IEmployeeRepository` | Employee-specific queries (filter by status, search by ID) |
+| `IPensionRepository` | Pension-specific queries (get active pensions, get by employee) |
+| `UnitOfWork` | Coordinates all repositories in a single DB transaction |
+
+### MVC Flow
+
+```
+HTTP Request
+    │
+    ▼
+Controller  ──►  Service (Application Layer)
+    │                  │
+    │            Repository (Infrastructure)
+    │                  │
+    │            SQL Server Database
+    │
+    ▼
+View (.cshtml) ──► HTTP Response
+```
 
 ---
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit changes: `git commit -m "Add your feature"`
-4. Push to branch: `git push origin feature/your-feature`
+2. Create a feature branch
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+3. Commit your changes
+   ```bash
+   git commit -m "Add: your feature description"
+   ```
+4. Push to branch
+   ```bash
+   git push origin feature/your-feature-name
+   ```
 5. Open a Pull Request
 
 ---

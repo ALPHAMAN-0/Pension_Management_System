@@ -3,12 +3,10 @@
 ## Architecture / How it Works
 
 ```mermaid
-flowchart LR
-    A[User] --> B[Pension Management System]
-    B --> C{Logic}
-    C --> D[(Data)]
-    C --> E[Output]
-    D --> C
+flowchart TD
+    Requirements_PDF --> UI_Design
+    Requirements_PDF --> Documentation
+    UI_Design --> Documentation
 ```
 
 ### Govt. BD Pension — Centralized Pension Administration for Government Institutions
